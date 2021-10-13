@@ -24,3 +24,15 @@ class Logistic(Extreme):
         value_ = math.pow(math.pow(1-s, 1/self.theta) + np.sum(np.power(t, 1/self.theta)),self.theta)
 
         return value_
+
+    def rmvlog_tawn(self):
+        sim = np.zeros(self.n_sample * self.d)
+        for i in range(0 , self.n_sample):
+            s = self._rpstable(self.theta)
+            for j in range(0,d):
+                sim[i*self.d + j] = math.exp(self.theta * (s - math.log(np.random.exponential(size = 1))))
+        return sim
+
+    def rmvlog(self):
+        sim = self._frechet(self.rmvlog_tawn())
+        return sim.reshape(self.n_sample, self.d)
