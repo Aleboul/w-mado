@@ -29,6 +29,7 @@ class Multivariate(object):
         ------
             copula_type : substype of the copula
             random_seed : seed for the random generator
+                      d : dimension
         Attributes
         ----------
             copula_type(CopulaTypes) : family of the copula that belongs to
@@ -44,8 +45,9 @@ class Multivariate(object):
     n_sample = []
     asy = []
     theta = []
+    d = []
 
-    def __init__(self, random_seed = None, theta = None, n_sample = None, asy = None):
+    def __init__(self, random_seed = None, theta = None, n_sample = None, asy = None, d = None):
         """
             Initialize Multivariate object.
             
@@ -61,6 +63,7 @@ class Multivariate(object):
         self.theta = theta
         self.n_sample = n_sample
         self.asy = asy
+        self.d = d
 
     def _frechet(x):
         """
@@ -68,18 +71,18 @@ class Multivariate(object):
         """
         return np.exp(-1/x)
     
-    def _rpstable(cexp):
+    def _rpstable(self):
         """
             Simulation from a positive stable distribution.
             See Stephenson (2003) Section 3 for details.
         """
 
         if cexp==1: return 0
-        tcexp = 1-cexp
+        tcexp = 1-self.theta
         u = np.random.uniform(size = 1) * math.pi
         w = math.log(np.random.exponential(size = 1))
-        a = math.log(math.sin(tcexp*u)) + (cexp / tcexp) * math.log(math.sin(cexp*u)) - (1/tcexp) * math.log(math.sin(u))
-        return (tcexp / cexp) * (a-w)
+        a = math.log(math.sin(tcexp*u)) + (self.theta / tcexp) * math.log(math.sin(self.theta*u)) - (1/tcexp) * math.log(math.sin(u))
+        return (tcexp / self.theta) * (a-w)
 
 class Extreme(Multivariate):
     """
