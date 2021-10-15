@@ -25,6 +25,22 @@ class Logistic(Extreme):
 
         return value_
 
+    def _Adot(self, t, j):
+        """
+            Return the value of jth partial derivative of the Pickands dependence function taken on t
+
+            Inputs
+            ------
+            t(list[float]) : list of elements of the simplex in R^{d-1}
+                         j : index of the partial derivative > 2
+        """
+        j = j - 2
+        s = np.sum(t)
+        value_1 = (1/self.theta * math.pow(t[j],(1-self.theta)/self.theta) - 1/self.theta * math.pow(1-s,(1-self.theta)/self.theta))
+        value_2 = math.pow(self._A(t), (self.theta - 1)/self.theta)
+        value_  = self.theta * value_1 * value_2
+        return value_
+
     def rmvlog_tawn(self):
         sim = np.zeros(self.n_sample * self.d)
         for i in range(0 , self.n_sample):

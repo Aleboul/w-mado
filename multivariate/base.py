@@ -1,6 +1,6 @@
-import numpy as math
+import numpy as np
 import math
-
+from scipy.integrate import quad, dblquad
 from enum import Enum
 
 def min(a, b):
@@ -112,6 +112,7 @@ class Extreme(Multivariate):
         """
         log_u_ = np.log(u)
         value_ = math.exp(-self._l(-log_u_))
+        return value_
 
     def _mu(self, u, j):
         """
@@ -122,13 +123,107 @@ class Extreme(Multivariate):
             u(list[float]) : list of float between 0 and 1
             j(int) : jth derivative of the stable tail dependence function
         """
-        ## Besoin de définir les dérivées partielles de la Pickands
+        s = np.sum(u)
+        u_ = u[1:]
+        w_ = u_/s
+        if j == 1 :
+            deriv_ = []
+            for i in range(2,self.d+1):
+                value_deriv = self._Adot(w_, i) * w_[i-2] # i - 2 to start at zero which is w_2, we compute the array of derivative
+                deriv_.append(value_deriv)
+            value_ = self._A(w_) - np.sum(deriv_)
+            return value_
+        else :
+            deriv_ = []
+            for i in range(2, self.d+1):
+                if i == j:
+                    value_deriv = -(1-w_[i-2]) * self._Adot(w_, i)
+                    deriv_.append(value_deriv)
+                else:
+                    value_deriv = self._Adot(w_, i) * w_[i-2]
+                    deriv_.append(value_deriv)
+            value_ = self._A(w_) - np.sum(deriv_)
+            return value_
 
     def _dotC(self, u, j):
         """
             Return the value of \dot{C}_j taken on u
             .. math:: \dot{C}_j = C(u)/u_j * _mu_j(u)
         """
+        value_ = (self._C(u) / u[j-1]) * self._mu(u,j)
+        return value_
+
+    def _integrand_ev1(self, s, w, j):
+        """
+            First integrand
+
+            Inputs
+            ------
+            s(float) : float between 0 and 1 - w_j
+            w(list[float]) : d-array of the simplex
+            j(int) : int \geq 1 
+        """
+        z = s*w / (1-w[j-1])
+        w2d = w[1:]
+        z[j-1] = (1-s) # start at 0 if j = 1
+        z2d = z[1:]
+        A_j = self._A(w2d) / w[j-1]
+        value_ = self._A(z2d) + (1-s)*(A_j + (1-w[j-1])/w[j-1] - 1) + s*w[j-1] / (1-w[j-1])+1
+        return math.pow(value_,-2)
+
+    def _integrand_ev2(self, s, w, j, k):
+        """
+            Second integrand
+
+            Inputs
+            ------
+            s(float) : float between 0 and 1 - w_j
+            w(list[float]) : d-array of the simplex
+            j(int) : int \geq 1 
+        """
+        w2d = w[1:]
+        z = 0 * w
+        z[j-1] = (1-s)
+        z[k-1] = s
+        z2d = z[1:] 
+        A_j = self._A(w2d) / w[j-1]
+        A_k = self._A(w2d) / w[k-1]
+        value_ = self._A(z2d) + (1-s) * (A_j + (1-w[j-1])/w[j-1] - 1) + s * (A_k + (1-w[k-1])/w[k-1] -1) + 1
+        return math.pow(value_, -2)
+
+    def var_mado(self, w):
+        """
+            Return the variance of the Madogram for a given point on the simplex
+
+            Inputs
+            ------
+            w (list[float]) : array in the simplex .. math:: (w_2, \dots, w_d)
+        """
+        w2d = w[1:] 
+        squared_sigma_1 = math.pow(1+self._A(w2d),-2) * self._A(w2d) / (2+self._A(w2d))
+        squared_gamma_ = []
+        for i in range(0,self.d):
+            j = i+1
+            v_ = math.pow(self._mu(w,j) / (1+self._A(w2d)),2) * w[i] / (2*self._A(w2d) + 1 + 1 - w[i])
+            squared_gamma_.append(v_)
+        sigma_1_ = []
+        for i in range(0, self.d):
+            j = i+1
+            v_1 = self._mu(w,j) / (2 * math.pow(1+self._A(w2d),2)) * (w[i] / (2*self._A(w2d) + 1 + 1 - w[i]))
+            v_2 = self._mu(w,j) / (2 * math.pow(1+self._A(w2d),2))
+            v_3 = self._mu(w,j) / (w[i]*(1-w[i])) * quad(lambda s : self._integrand_ev1(s, w, j), 0.0, 1-w[i])[0]
+            v_  = v_1 - v_2 + v_3
+            sigma_1_.append(v_)
+        gamma_ = []
+        for k in range(1, self.d+1):
+            for j in range(1, k):
+                v_1 = self._mu(w,j) * self._mu(w,k) * math.pow(1+self._A(w2d),-2)
+                v_2 = self._mu(w,j) * self._mu(w,k) / (w[j-1] * w[k-1]) * quad(lambda s : self._integrand_ev2(s, w, j, k), 0.0, 1.0)[0]
+                v_  = v_2 - v_1
+                gamma_.append(v_)
+
+        value_ = squared_sigma_1 + np.sum(squared_gamma_) - 2 * np.sum(sigma_1_) + 2 * np.sum(gamma_)
+        return value_
 
 
 """
