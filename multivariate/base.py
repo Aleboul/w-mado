@@ -3,6 +3,12 @@ import math
 from scipy.integrate import quad, dblquad
 from enum import Enum
 
+"""
+    Commentaires :
+        Fixer une décision, w part de 0 ou 1.
+        Ajouter des vérifications de contraintes.
+"""
+
 def min(a, b):
   
     if a <= b:
@@ -16,7 +22,7 @@ class CopulaTypes(Enum):
     """
 
     LOGISTIC = 1
-    ASYMETRIC_LOGISTIC = 2
+    ASYMMETRIC_LOGISTIC = 2
 
 class Multivariate(object):
     """
@@ -65,7 +71,7 @@ class Multivariate(object):
         self.asy = asy
         self.d = d
 
-    def _frechet(x):
+    def _frechet(self,x):
         """
             Probability distribution function for Frechet's law.
         """
@@ -77,12 +83,18 @@ class Multivariate(object):
             See Stephenson (2003) Section 3 for details.
         """
 
-        if cexp==1: return 0
+        if self.theta==1: return 0
         tcexp = 1-self.theta
         u = np.random.uniform(size = 1) * math.pi
         w = math.log(np.random.exponential(size = 1))
         a = math.log(math.sin(tcexp*u)) + (self.theta / tcexp) * math.log(math.sin(self.theta*u)) - (1/tcexp) * math.log(math.sin(u))
         return (tcexp / self.theta) * (a-w)
+    
+    def sample(self, inv_cdf):
+        sample_ = self.sample_unimargin()
+        output = np.array([inv_cdf(sample_[:,j]) for j in range(0, self.d)])
+        output = np.ravel(output).reshape(self.n_sample, self.d, order = 'F')
+        return output.reshape(self.n_sample, self.d)
 
 class Extreme(Multivariate):
     """
@@ -152,6 +164,19 @@ class Extreme(Multivariate):
         """
         value_ = (self._C(u) / u[j-1]) * self._mu(u,j)
         return value_
+
+    def true_wmado(self, w):
+        """
+            Return the value of the w_madogram taken on w
+
+            Inputs
+            ------
+            w (list of [float]) : element of the simplex
+        """
+        w_ = w[1:]
+        value = self._A(w_) / (1+self._A(w_)) - (1/self.d)*np.sum(w / (1+w))
+        return value
+
 
     def _integrand_ev1(self, s, w, j):
         """
@@ -235,19 +260,15 @@ def simplex(d, n = 50, a = 0, b = 1):
         http://www.eirene.de/Devroye.pdf
         Algorithm page 207
     """
-    if d==2:
-        output = np.linspace(a,b,n)
-        return np.c_[w,1-w]
-    else:
-        output = np.zeros([n,d])
-        for k in range(0,n):
-            x_ = np.zeros(d+1)
-            y_ = np.zeros(d)
-            for i in range(1, d):
-                x_[i] = np.random.uniform(a,b)
-            x_[d] = 1.0
-            x_ = np.sort(x_)
-            for i in range(1,d+1):
-                y_[i-1] = x_[i] - x_[i-1]
-            output[k,:] = y_
-        return output
+    output = np.zeros([n,d])
+    for k in range(0,n):
+        x_ = np.zeros(d+1)
+        y_ = np.zeros(d)
+        for i in range(1, d):
+            x_[i] = np.random.uniform(a,b)
+        x_[d] = 1.0
+        x_ = np.sort(x_)
+        for i in range(1,d+1):
+            y_[i-1] = x_[i] - x_[i-1]
+        output[k,:] = y_
+    return output
