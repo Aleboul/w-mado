@@ -12,7 +12,7 @@ class Monte_Carlo(object):
 			n_sample (list of int or [int]) : multiple length of sample
 			                   lmbd (float) : value of lambda	
 			 random_seed (Union[int, None]) : seed for the random generator
-						p (list of [float]) : array of probabilities of presence
+						  P (array [float]) : d \times d array of probabilities of presence
 							copula (object) : law of the vector of the uniform margin
 					   copula_miss (object) : dependence modeling of the couple (I,J)
                                 w ([float]) : vector of weight belonging to the simplex
@@ -20,7 +20,7 @@ class Monte_Carlo(object):
 		----------
 			          n_sample (list[int]) : several lengths used for estimation
 							  lmbd (float) : parameter for the lambda-FMadogram
-			lmbd_interval ([lower, upper]) : interval of valid thetahs for the given lambda-FMadogram
+			lmbd_interval ([lower, upper]) : interval of valid thetas for the given lambda-FMadogram
 						  simu (DataFrame) : results of the Monte-Carlo simulation
     """
 
@@ -32,7 +32,7 @@ class Monte_Carlo(object):
     copula_miss = None
     d = None
 
-    def __init__(self, n_iter = None, n_sample = [], w = [], random_seed = [], copula = None, p = None, copula_miss = None, d = None):
+    def __init__(self, n_iter = None, n_sample = [], w = [], random_seed = [], copula = None, P = None, copula_miss = None, d = None):
         """
             Initialize Monte_Carlo object
         """
@@ -41,7 +41,7 @@ class Monte_Carlo(object):
         self.n_sample = n_sample
         self.w = w
         self.copula = copula
-        self.p = p
+        self.P = P
         self.copula_miss = copula_miss
         self.d = self.copula.d
 
@@ -106,7 +106,7 @@ class Monte_Carlo(object):
         else :
             value_1 = np.amax(V,1)
             value_2 = (1/self.copula.d) * np.sum(V, 1)
-            mado = (1/(Tnb)) * np.sum(value_1 - value_2)
+            mado = (1/(np.sum(cross))) * np.sum(value_1 - value_2)
 
         return mado
 
@@ -114,19 +114,19 @@ class Monte_Carlo(object):
         """
 			This function returns an array max(n_sample) \times 2 of binary indicate missing of X or Y.
 			Dependence between (I,J) is given by copula_miss. The idea is the following
-			I \sim Ber(p[0]), J \sim Ber(p[1]) and (I,J) \sim Ber(copula_miss(p[0], p[1])).
+			I \sim Ber(P[0][0]), J \sim Ber(P[1][1]) and (I,J) \sim Ber(copula_miss(P[0][0], P[1][1])).
 			
 			We simulate it by generating a sample (U,V) of length max(n_sample) from copula_miss.
 
-			Then, X = 1 if U \leq p[0] and Y = 1 if V \leq p[1]. These random variables are indeed Bernoulli.
+			Then, X = 1 if U \leq P[0][0] and Y = 1 if V \leq P[1][1]. These random variables are indeed Bernoulli.
 			
-			Also \mathbb{P}(X = 1, Y = 1) = \mathbb{P}(U\leq p[0], V \leq p[1]) = C(p[0], p[1])
+			Also \mathbb{P}(X = 1, Y = 1) = \mathbb{P}(U\leq P[0][0], V \leq P[1][1]) = C(P[0][0], P[1][1])
 		"""
         if self.copula_miss is None:
-        	return np.array([np.random.binomial(1, self.p[j], np.max(self.n_sample)) for j in range(0,self.d)]).reshape(np.max(self.n_sample), self.d)
+        	return np.array([np.random.binomial(1, self.P[j][j], np.max(self.n_sample)) for j in range(0,self.d)]).reshape(np.max(self.n_sample), self.d)
         else :
         	sample_ = self.copula_miss.sample_unimargin()
-        	miss_ = np.array([1 * (sample_[:,j] <= self.p[j]) for j in range(0,self.d)])
+        	miss_ = np.array([1 * (sample_[:,j] <= self.P[j][j]) for j in range(0,self.d)])
         	return miss_
     
     def finite_sample(self, inv_cdf, corr = {False, True}):
